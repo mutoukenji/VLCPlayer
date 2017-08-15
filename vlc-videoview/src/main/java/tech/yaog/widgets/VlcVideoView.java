@@ -203,30 +203,33 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
     private void generateSurfaceViews() {
         videoSurface = new SurfaceView(getContext());
         subtitleSurface = new SurfaceView(getContext());
-        addView(videoSurface, 0);
-        addView(subtitleSurface, 1);
+        addView(videoSurface, 0, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        addView(subtitleSurface, 1, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
     }
 
     public void init(String... options) {
-        if (vlc != null && !vlc.isReleased()) {
-            vlc.release();
+        if (!isInEditMode()) {
+            if (vlc != null && !vlc.isReleased()) {
+                vlc.release();
+            }
+            vlc = new LibVLC(getContext(), new ArrayList<>(Arrays.asList(options)));
         }
-        vlc = new LibVLC(getContext(), new ArrayList<>(Arrays.asList(options)));
     }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        if (player != null && !player.isReleased()) {
-            player.release();
+        if (!isInEditMode()) {
+            if (player != null && !player.isReleased()) {
+                player.release();
+            }
+            player = new MediaPlayer(vlc);
+            player.setEventListener(this);
+            player.getVLCVout().setVideoView(videoSurface);
+            player.getVLCVout().setSubtitlesView(subtitleSurface);
+            player.getVLCVout().addCallback(this);
+            player.getVLCVout().attachViews();
         }
-        player = new MediaPlayer(vlc);
-        player.setEventListener(this);
-        player.getVLCVout().setVideoView(videoSurface);
-        player.getVLCVout().setSubtitlesView(subtitleSurface);
-        player.getVLCVout().addCallback(this);
-        player.getVLCVout().attachViews();
-
         stateMachine.event(new Event<>(PlayerEvent.Attach));
     }
 
@@ -247,11 +250,18 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        Log.v(TAG, "widthMode:"+ MeasureSpec.toString(widthMeasureSpec));
+        Log.v(TAG, "heightMode:"+ MeasureSpec.toString(heightMeasureSpec));
         widthMode = MeasureSpec.getMode(widthMeasureSpec);
         heightMode = MeasureSpec.getMode(heightMeasureSpec);
         videoSurface.measure(widthMeasureSpec, heightMeasureSpec);
         subtitleSurface.measure(widthMeasureSpec, heightMeasureSpec);
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
     }
 
     public boolean canPause() {
@@ -352,25 +362,29 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
     public void onNewLayout(IVLCVout vlcVout, int width, int height, int visibleWidth, int visibleHeight, int sarNum, int sarDen) {
         int newWidth = getMeasuredWidth();
         int newHeight = getMeasuredHeight();
-        if (widthMode == MeasureSpec.UNSPECIFIED && heightMode == MeasureSpec.UNSPECIFIED) {
+        Log.v(TAG, "measuredWH:"+newWidth+","+newHeight);
+        Log.v(TAG, "newLayout:"+width+","+height);
+        Log.v(TAG, "mode:"+widthMode+","+heightMode);
+        if ((widthMode == MeasureSpec.UNSPECIFIED || widthMode == MeasureSpec.AT_MOST) && (heightMode == MeasureSpec.UNSPECIFIED || heightMode == MeasureSpec.AT_MOST)) {
             newWidth = width;
             newHeight = height;
         }
-        else if (widthMode == MeasureSpec.AT_MOST && heightMode == MeasureSpec.UNSPECIFIED) {
+        else if (widthMode == MeasureSpec.EXACTLY && (heightMode == MeasureSpec.UNSPECIFIED || heightMode == MeasureSpec.AT_MOST)) {
             newHeight = newWidth / width * height;
         }
-        else if (widthMode == MeasureSpec.UNSPECIFIED && heightMode == MeasureSpec.AT_MOST) {
+        else if ((widthMode == MeasureSpec.UNSPECIFIED || widthMode == MeasureSpec.AT_MOST) && heightMode == MeasureSpec.EXACTLY) {
             newWidth = newHeight / height * width;
         }
+        Log.v(TAG, "changed:"+newWidth+","+newHeight);
         videoSurface.getHolder().setFixedSize(newWidth, newHeight);
         subtitleSurface.getHolder().setFixedSize(newWidth, newHeight);
         vlcVout.setWindowSize(newWidth, newHeight);
         if (newHeight != getMeasuredHeight() || newWidth != getMeasuredWidth()) {
             ViewGroup.LayoutParams layoutParams = getLayoutParams();
-            if (widthMode == MeasureSpec.UNSPECIFIED) {
+            if (widthMode == MeasureSpec.UNSPECIFIED || widthMode == MeasureSpec.AT_MOST) {
                 layoutParams.width = newWidth;
             }
-            if (heightMode == MeasureSpec.UNSPECIFIED) {
+            if (heightMode == MeasureSpec.UNSPECIFIED || heightMode == MeasureSpec.AT_MOST) {
                 layoutParams.height = newHeight;
             }
             setLayoutParams(layoutParams);
