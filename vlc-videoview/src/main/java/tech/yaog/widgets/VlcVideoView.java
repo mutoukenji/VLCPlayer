@@ -24,8 +24,8 @@ import tech.yaog.utils.statemachine.State;
 import tech.yaog.utils.statemachine.StateMachine;
 
 /**
- * VLC 视频播放器
- * 只包含基础功能，用法类似{@linkplain android.widget.VideoView|VideoView}
+ * VLC 视频播放器.
+ * 只包含基础功能，用法类似 {@linkplain android.widget.VideoView VideoView} .
  * Created by mutoukenji on 2017/8/14.
  */
 public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListener, IVLCVout.Callback {
