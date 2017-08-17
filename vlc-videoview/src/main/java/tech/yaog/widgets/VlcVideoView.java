@@ -15,6 +15,7 @@ import org.videolan.libvlc.LibVLC;
 import org.videolan.libvlc.Media;
 import org.videolan.libvlc.MediaPlayer;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -24,25 +25,55 @@ import tech.yaog.utils.statemachine.StateMachine;
 
 /**
  * VLC 视频播放器
- * Created by ygl_h on 2017/8/14.
+ * 只包含基础功能，用法类似{@linkplain android.widget.VideoView|VideoView}
+ * Created by mutoukenji on 2017/8/14.
  */
 public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListener, IVLCVout.Callback {
 
     private static final String TAG = VlcVideoView.class.getName();
 
+    /**
+     * 设置播放回调事件监听
+     * @param playbackEvent 播放回调事件
+     */
     public void setPlaybackEvent(PlaybackEvent playbackEvent) {
         this.playbackEvent = playbackEvent;
     }
 
+    /**
+     * 播放回调事件
+     */
     public interface PlaybackEvent {
+        /**
+         * 开始播放
+         */
         void onStart();
+
+        /**
+         * 播放完成
+         */
         void onEnded();
+
+        /**
+         * 视频读取或解码错误
+         */
         void onError();
+
+        /**
+         * 缓冲比例
+         * @param percent 缓冲比例（0-100）
+         */
         void onBuffering(int percent);
+
+        /**
+         * 当前播放位置
+         * @param msec 毫秒数
+         */
         void onPosition(int msec);
     }
 
     private LibVLC vlc;
+    private Uri subtitle;
     private Media media;
     private MediaPlayer player;
     private float buffering;
@@ -64,6 +95,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
     private enum PlayerEvent {
         Attach,
         AskForPlay,
+        SetSubtitle,
         Play,
         Stop,
         Buffering,
@@ -91,6 +123,12 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                     @Override
                     public void handle(Object... data) {
                         player.setMedia(media);
+                        if (subtitle != null) {
+                            player.addSlave(Media.Slave.Type.Subtitle, subtitle, true);
+                        }
+                        else {
+                            player.setSpuTrack(-1);
+                        }
                         player.play();
                     }
                 })
@@ -104,7 +142,25 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                         }
                     }
                 })
-                .onEvent(PlayerEvent.Play, PlayerState.Playing)
+                .onEvent(PlayerEvent.SetSubtitle, new State.Handler() {
+                    @Override
+                    public void handle(Object... data) {
+                        if (subtitle != null) {
+                            player.addSlave(Media.Slave.Type.Subtitle, subtitle, true);
+                        }
+                        else {
+                            player.setSpuTrack(-1);
+                        }
+                    }
+                })
+                .onEvent(PlayerEvent.Play, PlayerState.Playing, new State.Handler() {
+                    @Override
+                    public void handle(Object... data) {
+                        if (playbackEvent != null) {
+                            playbackEvent.onStart();
+                        }
+                    }
+                })
                 .onEvent(PlayerEvent.Pause, PlayerState.Paused)
                 .onEvent(PlayerEvent.Error, PlayerState.Attached, new State.Handler() {
                     @Override
@@ -141,6 +197,17 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                     }
                 })
                 .onEvent(PlayerEvent.Pause, PlayerState.Paused)
+                .onEvent(PlayerEvent.SetSubtitle, new State.Handler() {
+                    @Override
+                    public void handle(Object... data) {
+                        if (subtitle != null) {
+                            player.addSlave(Media.Slave.Type.Subtitle, subtitle, true);
+                        }
+                        else {
+                            player.setSpuTrack(-1);
+                        }
+                    }
+                })
                 .onEvent(PlayerEvent.Error, PlayerState.Attached, new State.Handler() {
                     @Override
                     public void handle(Object... data) {
@@ -162,6 +229,17 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                     @Override
                     public void handle(Object... data) {
                         player.stop();
+                    }
+                })
+                .onEvent(PlayerEvent.SetSubtitle, new State.Handler() {
+                    @Override
+                    public void handle(Object... data) {
+                        if (subtitle != null) {
+                            player.addSlave(Media.Slave.Type.Subtitle, subtitle, true);
+                        }
+                        else {
+                            player.setSpuTrack(-1);
+                        }
                     }
                 })
                 .onEvent(PlayerEvent.Resume, PlayerState.Playing, new State.Handler() {
@@ -207,6 +285,10 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
         addView(subtitleSurface, 1, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
     }
 
+    /**
+     * VLC 接口初始化（可选）
+     * @param options VLC 参数，详情请参考 https://wiki.videolan.org/VLC_command-line_help/
+     */
     public void init(String... options) {
         if (!isInEditMode()) {
             if (vlc != null && !vlc.isReleased()) {
@@ -250,8 +332,6 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        Log.v(TAG, "widthMode:"+ MeasureSpec.toString(widthMeasureSpec));
-        Log.v(TAG, "heightMode:"+ MeasureSpec.toString(heightMeasureSpec));
         widthMode = MeasureSpec.getMode(widthMeasureSpec);
         heightMode = MeasureSpec.getMode(heightMeasureSpec);
         videoSurface.measure(widthMeasureSpec, heightMeasureSpec);
@@ -264,26 +344,53 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
         super.onLayout(changed, left, top, right, bottom);
     }
 
+    /**
+     * 可否暂停
+     * @return 可否暂停
+     */
     public boolean canPause() {
         return true;
     }
 
+    /**
+     * 可否后倒
+     * @return 可否后倒
+     */
     public boolean canSeekBackward() {
         return player.isSeekable();
     }
 
+    /**
+     * 可否快进
+     * @return 可否快进
+     */
     public boolean canSeekForward() {
         return player.isSeekable() && player.getPosition() < 1;
     }
 
+    /**
+     * 取得当前缓冲比例
+     * @return 当前缓冲比例 (0 - 100)
+     */
     public int getBufferPercentage() {
         return (int) (buffering);
     }
 
+    /**
+     * 取得当前播放位置
+     * @return 当前播放位置(ms)
+     */
     public int getCurrentPosition() {
+        if (player == null) {
+            return -1;
+        }
         return (int) player.getTime();
     }
 
+    /**
+     * 取得视频长度
+     * @return 视频长度(ms)
+     */
     public int getDuration() {
         if (media != null) {
             return (int) media.getDuration();
@@ -291,46 +398,103 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
         return -1;
     }
 
+    /**
+     * 是否正在播放
+     * @return 是否正在播放
+     */
     public boolean isPlaying() {
+        if (player == null) {
+            return false;
+        }
         return player.isPlaying();
     }
 
+    /**
+     * 暂停
+     */
     public void pause() {
         stateMachine.event(new Event<>(PlayerEvent.Pause));
     }
 
+    /**
+     * 继续播放
+     */
     public void resume() {
         stateMachine.event(new Event<>(PlayerEvent.Resume));
     }
 
+    /**
+     * 跳转至
+     * @param msec 跳转到的位置 (ms)
+     */
     public void seekTo(int msec) {
         player.setPosition((float) ((double) msec / (double)media.getDuration()));
     }
 
+    /**
+     * 设置视频路径（本地文件）
+     * @param path 文件路径
+     */
     public void setVideoPath(String path) {
         media = new Media(vlc, path);
     }
 
+    /**
+     * 设置视频路径（网络视频）
+     * @param uri 视频地址
+     */
     public void setVideoURI(Uri uri) {
         media = new Media(vlc, uri);
     }
 
+    /**
+     * 开始播放
+     */
     public void start() {
         if (media != null) {
             stateMachine.event(new Event<>(PlayerEvent.AskForPlay));
         }
     }
+
+    /**
+     * 停止播放
+     */
     public void stopPlayback() {
         stateMachine.event(new Event<>(PlayerEvent.Stop));
     }
 
+    /**
+     * 暂停
+     */
     public void suspend() {
         pause();
     }
 
+    /**
+     * 设置字幕文件路径
+     * @param path 字幕文件路径
+     */
+    public void setSubtitle(String path) {
+        if (path != null) {
+            setSubtitle(Uri.fromFile(new File(path)));
+        }
+        else {
+            subtitle = null;
+            stateMachine.event(new Event<>(PlayerEvent.SetSubtitle));
+        }
+    }
+
+    /**
+     * 设置字幕地址
+     * @param uri 在线字幕地址
+     */
+    public void setSubtitle(Uri uri) {
+        subtitle = uri;
+        stateMachine.event(new Event<>(PlayerEvent.SetSubtitle));
+    }
+
     @Override
     public void onEvent(MediaPlayer.Event event) {
-        Log.v(TAG, "event:"+Integer.toHexString(event.type));
         switch(event.type) {
             case MediaPlayer.Event.Buffering:
                 buffering = event.getBuffering();
@@ -360,26 +524,49 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
 
     @Override
     public void onNewLayout(IVLCVout vlcVout, int width, int height, int visibleWidth, int visibleHeight, int sarNum, int sarDen) {
-        int newWidth = getMeasuredWidth();
-        int newHeight = getMeasuredHeight();
+        int oldWidth = getMeasuredWidth();
+        int oldHeight = getMeasuredHeight();
+        int newWidth = oldWidth;
+        int newHeight = oldHeight;
         Log.v(TAG, "measuredWH:"+newWidth+","+newHeight);
         Log.v(TAG, "newLayout:"+width+","+height);
-        Log.v(TAG, "mode:"+widthMode+","+heightMode);
-        if ((widthMode == MeasureSpec.UNSPECIFIED || widthMode == MeasureSpec.AT_MOST) && (heightMode == MeasureSpec.UNSPECIFIED || heightMode == MeasureSpec.AT_MOST)) {
-            newWidth = width;
-            newHeight = height;
+        Log.v(TAG, "mode:"+(widthMode == MeasureSpec.AT_MOST?"AT_MOST":widthMode==MeasureSpec.UNSPECIFIED?"UNSPECIFIED":"EX")+","+(heightMode == MeasureSpec.AT_MOST?"AT_MOST":heightMode==MeasureSpec.UNSPECIFIED?"UNSPECIFIED":"EX"));
+
+        double widthRate = (double) width / (double)oldWidth;
+        double heightRate = (double) height / (double)oldHeight;
+
+        Log.v(TAG, "ratios:"+widthRate+":"+heightRate);
+
+        if (widthRate > heightRate) {
+            if (widthMode == MeasureSpec.AT_MOST) {
+                newWidth = Math.min(width, oldWidth);
+            }
+            else if(widthMode == MeasureSpec.UNSPECIFIED) {
+                newWidth = width;
+            }
+            if (heightMode == MeasureSpec.AT_MOST || heightMode == MeasureSpec.UNSPECIFIED) {
+                newHeight = (int) Math.ceil((double)newWidth / (double)width * (double)height);
+            }
         }
-        else if (widthMode == MeasureSpec.EXACTLY && (heightMode == MeasureSpec.UNSPECIFIED || heightMode == MeasureSpec.AT_MOST)) {
-            newHeight = newWidth / width * height;
+        else {
+            if (heightMode == MeasureSpec.AT_MOST) {
+                newHeight = Math.min(height, oldHeight);
+            }
+            else if (heightMode == MeasureSpec.UNSPECIFIED) {
+                newHeight = height;
+            }
+            if (widthMode == MeasureSpec.AT_MOST || widthMode == MeasureSpec.UNSPECIFIED) {
+                newWidth = (int) Math.ceil((double)newHeight / (double)height * (double)width);
+            }
         }
-        else if ((widthMode == MeasureSpec.UNSPECIFIED || widthMode == MeasureSpec.AT_MOST) && heightMode == MeasureSpec.EXACTLY) {
-            newWidth = newHeight / height * width;
-        }
+
         Log.v(TAG, "changed:"+newWidth+","+newHeight);
+
         videoSurface.getHolder().setFixedSize(newWidth, newHeight);
         subtitleSurface.getHolder().setFixedSize(newWidth, newHeight);
         vlcVout.setWindowSize(newWidth, newHeight);
-        if (newHeight != getMeasuredHeight() || newWidth != getMeasuredWidth()) {
+
+        if (newHeight != oldHeight || newWidth != oldWidth) {
             ViewGroup.LayoutParams layoutParams = getLayoutParams();
             if (widthMode == MeasureSpec.UNSPECIFIED || widthMode == MeasureSpec.AT_MOST) {
                 layoutParams.width = newWidth;

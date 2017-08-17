@@ -19,7 +19,10 @@ import tech.yaog.widgets.VlcVideoView;
 public class MainActivity extends AppCompatActivity {
 
     private VlcVideoView videoView;
+//    private VlcVideoView videoView2;
+//    private VlcVideoView videoView3;
     private String videoFilePath;
+    private String videoFilePath2;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,7 +30,9 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         videoView = (VlcVideoView) findViewById(R.id.video);
-        videoView.init("-vvv");
+//        videoView2 = (VlcVideoView) findViewById(R.id.video2);
+//        videoView3 = (VlcVideoView) findViewById(R.id.video3);
+//        videoView.init("-vvv");
 
         File dir = getExternalFilesDir(Environment.DIRECTORY_MOVIES);
         if (dir != null) {
@@ -63,20 +68,27 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
             videoFilePath = dir.getAbsolutePath()+File.separator+"demo.flv";
+            videoFilePath2 = dir.getAbsolutePath()+File.separator+"demo.mp4";
         }
 
-        videoView.setVideoPath(videoFilePath);
+        videoView.setVideoPath(videoFilePath2);
+//        videoView2.setVideoPath(videoFilePath);
+//        videoView3.setVideoPath(videoFilePath2);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         videoView.start();
+//        videoView2.start();
+//        videoView3.start();
     }
 
     @Override
     protected void onStop() {
         videoView.stopPlayback();
+//        videoView2.stopPlayback();
+//        videoView3.stopPlayback();
         super.onStop();
     }
 
@@ -84,11 +96,15 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         videoView.resume();
+//        videoView2.resume();
+//        videoView3.resume();
     }
 
     @Override
     protected void onPause() {
         videoView.pause();
+//        videoView2.pause();
+//        videoView3.pause();
         super.onPause();
     }
 }
