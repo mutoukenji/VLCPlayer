@@ -301,6 +301,9 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
      * @return 可否后倒
      */
     public boolean canSeekBackward() {
+        if (player == null) {
+            return false;
+        }
         return player.isSeekable();
     }
 
@@ -310,6 +313,9 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
      * @return 可否快进
      */
     public boolean canSeekForward() {
+        if (player == null) {
+            return false;
+        }
         return player.isSeekable() && player.getPosition() < 1;
     }
 
@@ -378,6 +384,9 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
      * @param msec 跳转到的位置 (ms)
      */
     public void seekTo(int msec) {
+        if (player == null) {
+            return;
+        }
         player.setPosition((float) ((double) msec / (double) media.getDuration()));
     }
 
