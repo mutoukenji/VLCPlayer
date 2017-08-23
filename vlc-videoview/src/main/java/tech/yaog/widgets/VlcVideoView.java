@@ -72,7 +72,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                     public void handle(Object... data) {
                         if (playbackEvent != null) {
                             if (data.length > 0) {
-                                playbackEvent.onBuffering((int) data[0]);
+                                playbackEvent.onBuffering(((Float) data[0]).intValue());
                             }
                         }
                     }
@@ -125,7 +125,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                     public void handle(Object... data) {
                         if (playbackEvent != null) {
                             if (data.length > 0) {
-                                playbackEvent.onPosition((int) data[0]);
+                                playbackEvent.onPosition((Integer) data[0]);
                             }
                         }
                     }
