@@ -114,12 +114,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                         }
                     }
                 })
-                .onEvent(PlayerEvent.Stop, PlayerState.Attached, new State.Handler() {
-                    @Override
-                    public void handle(Object... data) {
-                        player.stop();
-                    }
-                })
+                .onEvent(PlayerEvent.Stop, PlayerState.Stopping)
                 .onEvent(PlayerEvent.Position, new State.Handler() {
                     @Override
                     public void handle(Object... data) {
@@ -150,6 +145,30 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                     }
                 });
 
+        State<PlayerState, PlayerEvent> stopping = new State<PlayerState, PlayerEvent>(PlayerState.Stopping)
+                .onEntry(new State.Handler() {
+                    @Override
+                    public void handle(Object... data) {
+                        player.stop();
+                    }
+                })
+                .onEvent(PlayerEvent.Stopped, PlayerState.Attached, new State.Handler() {
+                    @Override
+                    public void handle(Object... data) {
+                        if (playbackEvent != null) {
+                            playbackEvent.onStop();
+                        }
+                    }
+                })
+                .onEvent(PlayerEvent.Error, PlayerState.Attached, new State.Handler() {
+                    @Override
+                    public void handle(Object... data) {
+                        if (playbackEvent != null) {
+                            playbackEvent.onError();
+                        }
+                    }
+                });
+
         State<PlayerState, PlayerEvent> paused = new State<PlayerState, PlayerEvent>(PlayerState.Paused)
                 .onEntry(new State.Handler() {
                     @Override
@@ -158,12 +177,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                     }
                 })
                 .onEvent(PlayerEvent.End, PlayerState.Attached)
-                .onEvent(PlayerEvent.Stop, PlayerState.Attached, new State.Handler() {
-                    @Override
-                    public void handle(Object... data) {
-                        player.stop();
-                    }
-                })
+                .onEvent(PlayerEvent.Stop, PlayerState.Stopping)
                 .onEvent(PlayerEvent.SetSubtitle, new State.Handler() {
                     @Override
                     public void handle(Object... data) {
@@ -181,7 +195,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                     }
                 });
 
-        stateMachine.setStates(waitingAttach, waitingAttachPlay, attached, buffering, playing, paused);
+        stateMachine.setStates(waitingAttach, waitingAttachPlay, attached, buffering, playing, stopping, paused);
         stateMachine.start();
     }
 
@@ -259,7 +273,6 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
 
     @Override
     protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
         if (player != null && !player.isReleased()) {
             player.getVLCVout().removeCallback(this);
             player.release();
@@ -270,6 +283,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
         if (vlc != null && !vlc.isReleased()) {
             vlc.release();
         }
+        super.onDetachedFromWindow();
     }
 
     @Override
@@ -464,6 +478,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
                 stateMachine.event(new Event<>(PlayerEvent.Buffering, buffering));
                 break;
             case MediaPlayer.Event.Stopped:
+                stateMachine.event(new Event<>(PlayerEvent.Stopped));
                 break;
             case MediaPlayer.Event.Paused:
                 break;
@@ -558,6 +573,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
         Attached,
         Buffering,
         Playing,
+        Stopping,
         Paused
     }
 
@@ -567,6 +583,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
         SetSubtitle,
         Play,
         Stop,
+        Stopped,
         Buffering,
         Position,
         Pause,
@@ -583,6 +600,11 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
          * 开始播放
          */
         void onStart();
+
+        /**
+         * 停止播放
+         */
+        void onStop();
 
         /**
          * 播放完成
