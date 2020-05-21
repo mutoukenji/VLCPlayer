@@ -411,6 +411,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
      */
     public void setVideoPath(String path) {
         media = new Media(vlc, path);
+        media.setHWDecoderEnabled(true, false);
     }
 
     /**
@@ -420,6 +421,7 @@ public class VlcVideoView extends FrameLayout implements MediaPlayer.EventListen
      */
     public void setVideoURI(Uri uri) {
         media = new Media(vlc, uri);
+        media.setHWDecoderEnabled(true, false);
     }
 
     /**

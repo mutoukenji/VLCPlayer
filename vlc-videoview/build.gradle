@@ -13,7 +13,7 @@ ext {
     siteUrl = 'https://github.com/mutoukenji/VLCPlayer'
     gitUrl = 'https://github.com/mutoukenji/VLCPlayer.git'
 
-    libraryVersion = '0.0.9'
+    libraryVersion = '0.1.0'
 
     developerId = 'mutoukenji'
     developerName = 'MutouKenji'
@@ -49,8 +49,10 @@ dependencies {
     androidTestImplementation('com.android.support.test.espresso:espresso-core:2.2.2', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
-    implementation "de.mrmaffen:vlc-android-sdk:2.0.6"
-    implementation "tech.yaog.utils:state-machine:1.0.3"
+    api("de.mrmaffen:vlc-android-sdk:2.0.6", {
+        exclude group: 'com.android.support'
+    })
+    api "tech.yaog.utils:state-machine:1.0.3"
     testImplementation 'junit:junit:4.12'
 }
 
